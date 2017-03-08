@@ -3,20 +3,24 @@
 
 import sys, os, time, atexit
 from signal import SIGTERM
+import syslog
 
 class Daemon:
     def __init__(self, pidfile, stdin='/dev/null',  stdout='/dev/null', stderr='/dev/null'):
+        """ Init method"""
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         self.pidfile = pidfile
   
     def daemonize(self):
+        """creating a daemon here"""             
         try:
             pid = os.fork()
             if pid > 0:
                 sys.exit(0)
         except OSError, e:
+            syslog.syslog(syslog.LOG_INFO, "Fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.stderr.write("fork #1 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
   
@@ -30,9 +34,13 @@ class Daemon:
             if pid > 0:
                 sys.exit(0)
         except OSError, e:
+            syslog.syslog(syslog.LOG_ERR, "Fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1)
-  
+        
+        syslog.syslog(syslog.LOG_INFO, "Webserver daemon start was successful")
+        
+            
         # перенаправление стандартного ввода/вывода
         sys.stdout.flush()
         sys.stderr.flush()
@@ -49,34 +57,31 @@ class Daemon:
         file(self.pidfile,'w+').write("%s\n" % pid)
   
     def delpid(self):
+        """removing pidfile"""
         os.remove(self.pidfile)
 
     def start(self):
-        """
-        Запуск дeмона
-        """
-        # Проверяем pidfile, чтоб узнать не запущен ли уже процесс
+        """ Starting a daemon """
         try:
             pf = file(self.pidfile,'r')
             pid = int(pf.read().strip())
             pf.close()
-        except IOError:
+        except IOError, e:
             pid = None
+            sys.stderr.write("IOerror" + e.strerror)
   
         if pid:
             message = "pidfile %s already exist. Daemon already running?\n"
             sys.stderr.write(message % self.pidfile)
             sys.exit(1)
       
-        # Запуск дeмона
         self.daemonize()
         self.run()
 
     def stop(self):
         """
-        Остановка дeмона
+        Stopping daemon
         """
-        # Берем pid из pidfile
         try:
             pf = file(self.pidfile,'r')
             pid = int(pf.read().strip())
@@ -87,9 +92,8 @@ class Daemon:
         if not pid:
             message = "pidfile %s does not exist. Daemon not running?\n"
             sys.stderr.write(message % self.pidfile)
-            return # не считается ошибкой при перезапуске
+            return
 
-        # Убиваем процесс дeмона
         try:
             while 1:
                 os.kill(pid, SIGTERM)
@@ -104,14 +108,9 @@ class Daemon:
                 sys.exit(1)
 
     def restart(self):
-        """
-        Перезапуск дeмона
-        """
+        """restart daemon"""
         self.stop()
         self.start()
 
     def run(self):
-        """
-        Вы должны переопределить данный метод в подклассе. Он должен быть вызван
-        после вызова метода daemonize() в методе start().
-        """
+        """ override it at the object """

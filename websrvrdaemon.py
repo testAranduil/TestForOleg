@@ -5,10 +5,12 @@ import websrvr
 from daemon import Daemon
 
 class MyDaemon(Daemon):
+    """ Class override """
     def run(self):
         websrvr.start()
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
+    """Main Block"""
     my_daemon = MyDaemon('/var/run/webserver.pid')
 
     if len(sys.argv) >= 2:
